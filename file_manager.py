@@ -1,6 +1,6 @@
 import json
 from datetime import date
-from dictionary_client import Word
+from Dictionary_client import Word
 
 # ==============================================================================
 # TASK 4: JSON FILE PERSISTENCE & DYNAMIC QUIZ GENERATOR
