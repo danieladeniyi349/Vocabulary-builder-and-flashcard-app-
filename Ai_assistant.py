@@ -9,7 +9,7 @@ class GeminiAssistant:
     """Integrates Google Gemini to provide intelligent word insights and study tips."""
     
     def __init__(self):
-        self.model_name = "gemini-3.8-flash"
+        self.model_name = "gemini-3.5-flash"
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         self.model = genai.GenerativeModel(self.model_name)
 
