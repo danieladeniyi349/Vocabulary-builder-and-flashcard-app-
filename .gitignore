@@ -1,0 +1,22 @@
+# Environment variables & API keys
+.env
+*.env
+
+# Python cached files & compiled bytecode
+__pycache__/
+*.py[cod]
+*$.py.class
+
+# Virtual environments
+venv/
+.env/
+env/
+
+# IDE & editor settings
+.vscode/
+.idea/
+
+# Database & local runtime storage files
+*.db
+*.sqlite3
+*.json
