@@ -2,7 +2,7 @@
 # TASK 1: MAIN APPLICATION LOOP & CLI MENU
 # ==============================================================================
 from input_sanitization import sanitize_input
-from error_handling import (
+from error_handling1 import (
     fetch_word_definition,
     WordNotFoundError,
     RateLimitError,
