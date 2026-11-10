@@ -1,10 +1,16 @@
-import os
 import threading
-import tkinter as tk
-from tkinter import messagebox
 from dotenv import load_dotenv
-
 load_dotenv()
+import os
+import json
+import random
+from datetime import date, timedelta
+import tkinter as tk
+from tkinter import messagebox, scrolledtext
+import requests
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+import google.generativeai as genai
 
 from Dictionary_client import DictionaryClient
 from Ai_assistant import GeminiAssistant
@@ -109,6 +115,12 @@ class SmartDictionaryApp:
             command=self.open_flashcards_window
         ).pack(side="left", padx=(0, 8))
 
+         tk.Button(
+            features, text="📝 TAKE QUIZ", font=("Arial", 9, "bold"),
+            bg="#B66A2C", fg="white", relief="flat", padx=12, pady=8,
+            command=self.start_quiz
+        ).pack(side="left")
+
         # Footer
         tk.Label(
             self.root, text="Powered by Free Dictionary API & Google Gemini",
@@ -201,6 +213,125 @@ class SmartDictionaryApp:
         if not due_cards:
             tk.Label(win, text="🎉 No flashcards due for review today!\nCheck back tomorrow or save more words.", font=("Arial", 11), bg="#F2F4F8", justify="center").pack(pady=40)
             return
+
+        card_state = {"index": 0}
+
+        card_frame = tk.Frame(win, bg="white", padx=15, pady=15, relief="solid", bd=1)
+        card_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        word_label = tk.Label(card_frame, text="", font=("Arial", 16, "bold"), bg="white", fg="#243B64")
+        word_label.pack(anchor="w", pady=(0, 10))
+
+        def_label = tk.Label(card_frame, text="", font=("Arial", 11), bg="white", wraplength=380, justify="left")
+        def_label.pack(anchor="w")
+
+        def show_current_card():
+            idx = card_state["index"]
+            if idx < len(due_cards):
+                c = due_cards[idx]
+                word_label.config(text=f"Word: {c.word.capitalize()}")
+                def_label.config(text=f"Definition: {c.definition}")
+            else:
+                messagebox.showinfo("Complete", "You've finished all due flashcards for today!")
+                win.destroy()
+
+        show_current_card()
+
+        btn_frame = tk.Frame(win, bg="#F2F4F8", pady=10)
+        btn_frame.pack()
+
+        def answer_card(remembered):
+            idx = card_state["index"]
+            c = due_cards[idx]
+            self.sr_manager.review(c.word, remembered)
+            card_state["index"] += 1
+            show_current_card()
+
+        tk.Button(btn_frame, text="❌ Forgot it", bg="#453B3B", fg="white", font=("Arial", 10, "bold"), padx=15, pady=8, command=lambda: answer_card(False)).pack(side="left", padx=10)
+        tk.Button(btn_frame, text="✔ Knew it", bg="#2F855A", fg="white", font=("Arial", 10, "bold"), padx=15, pady=8, command=lambda: answer_card(True)).pack(side="left", padx=10)
+
+    def start_quiz(self):
+        words = self.file_manager.load_words()
+        words = [w for w in words if w.definitions]
+
+        if len(words) < 4:
+            messagebox.showwarning("Not enough words", "You need at least 2 saved words in your dictionary to start a quiz. Save some words first!")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Vocabulary Quiz")
+        win.geometry("550x450")
+        win.configure(bg="#F2F4F8")
+
+        random.shuffle(words)
+        quiz_state = {"score": 0, "index": 0, "words": words}
+
+        tk.Label(win, text="Vocabulary Knowledge Quiz", font=("Arial", 14, "bold"), bg="#F2F4F8", fg="#243B64").pack(pady=15)
+
+        q_frame = tk.Frame(win, bg="white", padx=15, pady=15, relief="solid", bd=1)
+        q_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        q_label = tk.Label(q_frame, text="", font=("Arial", 12, "bold"), bg="white", fg="#243B64", wraplength=480, justify="left")
+        q_label.pack(anchor="w", pady=(0, 15))
+
+        var = tk.IntVar(value=-1)
+        radio_buttons = []
+
+        for i in range(4):
+            rb = tk.Radiobutton(q_frame, text="", variable=var, value=i, font=("Arial", 10), bg="white", wraplength=460, justify="left")
+            rb.pack(anchor="w", pady=4)
+            radio_buttons.append(rb)
+
+        current_options = []
+
+        def load_question():
+            idx = quiz_state["index"]
+            if idx >= len(quiz_state["words"]):
+                score = quiz_state["score"]
+                total = len(quiz_state["words"])
+                self.file_manager.save_quiz_score(score, total)
+                messagebox.showinfo("Quiz Finished", f"Quiz Complete!\nYour Score: {score}/{total} ({score/total*100:.1f}%)")
+                win.destroy()
+                return
+
+            c_word = quiz_state["words"][idx]
+            correct_def = c_word.definitions[0]
+
+            other_defs = [w.definitions[0] for w in quiz_state["words"] if w != c_word and w.definitions]
+            wrong_defs = random.sample(other_defs, min(3, len(other_defs))) if other_defs else ["No alternative definition available."]
+            
+            options = [correct_def] + wrong_defs
+            random.shuffle(options)
+            current_options.clear()
+            current_options.extend(options)
+
+            q_label.config(text=f"Question {idx+1} of {len(quiz_state['words'])}\nWhat is the meaning of '{c_word.word.upper()}':")
+            var.set(-1)
+            for i, opt in enumerate(options):
+                radio_buttons[i].config(text=opt, value=i)
+
+        def submit_answer():
+            if var.get() == -1:
+                messagebox.showwarning("Select one", "Please select an answer choice.")
+                return
+            
+            selected_text = current_options[var.get()]
+            correct_text = quiz_state["words"][quiz_state["index"]].definitions[0]
+
+            if selected_text == correct_text:
+                quiz_state["score"] += 1
+            
+            quiz_state["index"] += 1
+            load_question()
+
+        load_question()
+
+        tk.Button(
+            win, text="Submit Answer", font=("Arial", 10, "bold"),
+            bg="#243B64", fg="white", relief="flat", padx=20, pady=8,
+            command=submit_answer
+        ).pack(pady=15)
+
 
 
 if __name__ == "__main__":
