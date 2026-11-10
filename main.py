@@ -1,5 +1,5 @@
 from sanitize_input import sanitize_input
-from error_handling import handle_dictionary_errors
+from error_handling1 import handle_dictionary_errors
 from data_parser import parse_word_data
 from Word_model import Word
 
